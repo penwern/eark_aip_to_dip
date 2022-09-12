@@ -27,18 +27,18 @@ def get_namespaces(mets_file):
     for key in namespaces:
         ET.register_namespace(key, namespaces[key])
     return namespaces
-
+    
 
 def update_mets(dip_dir: Path, id_updates: dict):
 
     dip_uuid = dip_dir.name
 
-    expected_root_mets = dip_dir / 'METS.xml'
+    root_mets = dip_dir / 'METS.xml'
     # expected_rep_mets = dip_dir / 'representations' / 'METS.xml'
 
-    if expected_root_mets.is_file:
-        namespaces = get_namespaces(expected_root_mets)
-        tree = ET.parse(expected_root_mets)
+    if root_mets.is_file():
+        namespaces = get_namespaces(root_mets)
+        tree = ET.parse(root_mets)
         root = tree.getroot()
 
         root.attrib['OBJID'] = dip_uuid
@@ -59,8 +59,8 @@ def update_mets(dip_dir: Path, id_updates: dict):
             fileGrp_el.attrib['ID'], id_updates = update_id(fileGrp_el.attrib['ID'], id_updates)
             for file_el in fileGrp_el.findall('{%s}file' % namespaces['']):
                 file_el.attrib['ID'], id_updates = update_id(file_el.attrib['ID'], id_updates)
-            # Remove fileGrp element referencing Submissions directory
-            if fileGrp_el.attrib['USE'].lower().startswith('submission'):
+            # Remove fileGrp element referencing non-presrvation rep directory
+            if fileGrp_el.attrib['USE'].lower().endswith('-preservation'):
                 filesec_el.remove(fileGrp_el)
 
 
@@ -74,10 +74,15 @@ def update_mets(dip_dir: Path, id_updates: dict):
             div_el.attrib['ID'], id_updates = update_id(div_el.attrib['ID'], id_updates)
             if 'DMDID' in div_el.attrib:
                 div_el.attrib['DMDID'], id_updates = update_id(div_el.attrib['DMDID'], id_updates)
-            if div_el.attrib['LABEL'].lower().startswith('submission'):
+            # Remove div element referencing non-presrvation rep directory
+            if div_el.attrib['LABEL'].lower().endswith('-preservation'):
                 root_div_el.remove(div_el)
             for sub_div_el in div_el.findall('{%s}div' % namespaces['']):
                 sub_div_el.attrib['ID'], id_updates = update_id(sub_div_el.attrib['ID'], id_updates)
+            for mptr_el in div_el.findall('{%s}mptr' % namespaces['']):
+                mptr_el.attrib['{%s}title' % namespaces['xlink']], id_updates = update_id(mptr_el.attrib['{%s}title' % namespaces['xlink']], id_updates)
+            for fptr_el in div_el.findall('{%s}fptr' % namespaces['']):
+                fptr_el.attrib['FILEID'], id_updates = update_id(fptr_el.attrib['FILEID'], id_updates)
 
         ET.indent(tree, space='    ', level=0)
         tree.write(dip_dir / 'METS.xml', encoding='utf-8', xml_declaration=True)
@@ -86,11 +91,14 @@ def update_mets(dip_dir: Path, id_updates: dict):
 
 
 def transform(aip_dir: Path, output_dir: Path):
+    # Copy whole sip aside from non-preservation reps
+    # Update root mets to reflect changes
 
-    if True:
-        dip_uuid = new_uuid('uuid-')
-    else:
-        dip_uuid = aip_dir.name
+    dip_uuid = new_uuid('uuid-')
+
+    # For testing
+    # dip_uuid = aip_dir.name
+
     id_updates = {aip_dir.name: dip_uuid}
     dip_dir = output_dir / dip_uuid
     
@@ -99,13 +107,16 @@ def transform(aip_dir: Path, output_dir: Path):
         shutil.rmtree(dip_dir)
     dip_dir.mkdir(parents=True, exist_ok=False)
 
-    ignore_cases = ['submission']
-    for file in aip_dir.iterdir():
-        if file.name not in ignore_cases:
-            if file.is_dir():
-                shutil.copytree(file, dip_dir / file.name)
-            elif file.is_file():
-                shutil.copyfile(file, dip_dir / file.name)
+    for file_folder in aip_dir.iterdir():
+        if file_folder.is_dir():
+            if file_folder.stem == "representations":
+                for rep in file_folder.iterdir():
+                    if not rep.stem.endswith('-preservation'):
+                        shutil.copytree(rep, dip_dir / rep.relative_to(aip_dir))
+            else:
+                shutil.copytree(file_folder, dip_dir / file_folder.name)
+        elif file_folder.is_file():
+            shutil.copyfile(file_folder, dip_dir / file_folder.name)
 
     update_mets(dip_dir, id_updates)
 
