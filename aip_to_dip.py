@@ -90,7 +90,7 @@ def update_mets(dip_dir: Path, id_updates: dict):
         logging.info("METS written in: " + str(dip_dir))
 
 
-def transform(aip_dir: Path, output_dir: Path):
+def transform(aip_dir: Path, output_dir: Path) -> str:
     # Copy whole sip aside from non-preservation reps
     # Update root mets to reflect changes
 
@@ -119,6 +119,8 @@ def transform(aip_dir: Path, output_dir: Path):
             shutil.copyfile(file_folder, dip_dir / file_folder.name)
 
     update_mets(dip_dir, id_updates)
+
+    return dip_uuid
 
 
 def validate(aip_dir: Path, output_dir: Path) -> bool:
@@ -175,10 +177,10 @@ def main(argv):
         logging.fatal("No output directory given")
         sys.exit(2)
     if validate(aip_dir, output_dir):
-        transform(aip_dir, output_dir)
+        return transform(aip_dir, output_dir)
 
 
 if __name__ == '__main__':
     Path("logs").mkdir(exist_ok=True)
     logging.basicConfig(level=logging.DEBUG, filemode='a', filename='logs/aip_to_dip.log', format='%(asctime)s %(levelname)s: %(message)s')
-    main(sys.argv[1:])
+    print(main(sys.argv[1:]))
