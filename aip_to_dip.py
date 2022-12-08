@@ -86,7 +86,6 @@ def update_mets(dip_dir: Path, id_updates: dict):
 
         ET.indent(tree, space='    ', level=0)
         tree.write(dip_dir / 'METS.xml', encoding='utf-8', xml_declaration=True)
-        print(str(dip_dir.name))
         logging.info("METS written in: " + str(dip_dir))
 
 
@@ -162,7 +161,6 @@ def main(argv):
                 aip_dir = input_arg
             else:
                 logging.fatal('Invalid AIP')
-                print("Input is not a valid AIP directory")
                 sys.exit(2)
         elif opt in ("-o", "--output"):
             output_arg = Path(arg)
